@@ -11,6 +11,7 @@ import DesktopShortcut, { DesktopShortcutProps } from './DesktopShortcut';
 import Scrabble from '../applications/Scrabble';
 import { IconName } from '../../assets/icons';
 import Credits from '../applications/Credits';
+import LiveSites from '../applications/LiveSites';
 
 export interface DesktopProps {}
 
@@ -35,6 +36,12 @@ const APPLICATIONS: {
         name: 'My Showcase',
         shortcutIcon: 'showcaseIcon',
         component: ShowcaseExplorer,
+    },
+    livesites: {
+        key: 'livesites',
+        name: 'Live Sites',
+        shortcutIcon: 'windowExplorerIcon',
+        component: LiveSites,
     },
     trail: {
         key: 'trail',

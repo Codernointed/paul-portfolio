@@ -18,7 +18,7 @@ const CREDITS = [
     {
         title: '3D Engine & Assets',
         rows: [
-            ['Original engine (MIT)', 'See LICENSE.md in portfolio-website'],
+            ['Henry Heffernan', 'Original engine (MIT)'],
             ['Mickael Boitte', 'Computer model'],
             ['Sean Nicolas', 'Environment models'],
             ['Sound Cassette', 'Office ambience'],
@@ -27,16 +27,17 @@ const CREDITS = [
     {
         title: 'Special Thanks',
         rows: [
-            ['Bruno Simon', 'SimonDev'],
-            ['Lorelei Kravinsky', 'Scott Bass'],
-            ['Trey Briccetti', 'Mom, Dad & Angela'],
+            ['Mr. Okai', 'Lecturer, UMaT'],
+            ['Kwame Basoah', 'Head of IT, Best Assurance'],
+            ['Mom & Dad', 'For everything'],
+            ['Infinity Generation', 'Community'],
         ],
     },
     {
         title: 'Inspiration',
         rows: [
-            ['Bruno Simon', 'Jesse Zhou'],
-            ['Pink Yellow', 'Vivek Patel'],
+            ['Henry Heffernan', 'Bruno Simon'],
+            ['Jesse Zhou', 'SimonDev'],
         ],
     },
 ];
