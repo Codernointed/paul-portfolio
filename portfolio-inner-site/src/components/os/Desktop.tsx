@@ -12,6 +12,7 @@ import Scrabble from '../applications/Scrabble';
 import { IconName } from '../../assets/icons';
 import Credits from '../applications/Credits';
 import LiveSites from '../applications/LiveSites';
+import MobileApps from '../applications/MobileApps';
 
 export interface DesktopProps {}
 
@@ -42,6 +43,12 @@ const APPLICATIONS: {
         name: 'Live Sites',
         shortcutIcon: 'windowExplorerIcon',
         component: LiveSites,
+    },
+    mobileapps: {
+        key: 'mobileapps',
+        name: 'Mobile Apps',
+        shortcutIcon: 'windowGameIcon',
+        component: MobileApps,
     },
     trail: {
         key: 'trail',
