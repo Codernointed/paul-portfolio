@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Vercel local link (re-link per machine; do not commit)
+**/.vercel/
+
 # Build output
 portfolio-inner-site/build/
 portfolio-website/dist/
@@ -19,3 +22,4 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.vercel

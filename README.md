@@ -65,17 +65,33 @@ configured in `portfolio-website/src/Application/World/MonitorScreen.ts`.
 
 ---
 
-## Deploying
+## Deploying (Vercel)
 
-1. **Deploy the inner site** (`portfolio-inner-site`) as a normal Create React
-   App build — e.g. to Vercel. Note its public URL.
-2. In `portfolio-website/src/Application/World/MonitorScreen.ts`, set
-   `iframe.src` (the line marked `// TODO`) to that URL.
-3. **Build & deploy the 3D shell** (`portfolio-website`):
-   ```bash
-   npm run build   # outputs to ./dist
-   ```
-   Host the `dist` folder (or use `npm start` for the bundled Express server).
+Two Vercel projects from this monorepo — both connected to
+[github.com/Codernointed/paul-portfolio](https://github.com/Codernointed/paul-portfolio) for automatic deploys on push.
+
+| Vercel project | Root directory | URL | Role |
+|----------------|----------------|-----|------|
+| `codernointed-os` | `portfolio-inner-site` | https://codernointed-os.vercel.app | 2D OS (loads inside monitor) |
+| `paul-portfolio` | `portfolio-website` | https://paulbotchwey.com | 3D shell (public site) |
+
+**If Git deploys fail**, open each project in the [Vercel dashboard](https://vercel.com/dashboard) → **Settings → General → Root Directory** and set the path above.
+
+### CLI (one-time setup already done)
+
+```bash
+# Inner site
+cd portfolio-inner-site
+npx vercel link --project codernointed-os
+npx vercel --prod
+
+# 3D shell
+cd portfolio-website
+npx vercel link --project paul-portfolio
+npx vercel --prod
+```
+
+Domain **paulbotchwey.com** is attached to `paul-portfolio`. DNS uses Vercel nameservers (already configured).
 
 ---
 
