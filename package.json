@@ -1,0 +1,8 @@
+{
+  "name": "paul-portfolio-monorepo",
+  "private": true,
+  "description": "Monorepo router for Vercel Git deploys (inner-site + 3D shell)",
+  "scripts": {
+    "build": "node scripts/vercel-build.mjs"
+  }
+}

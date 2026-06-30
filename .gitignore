@@ -8,6 +8,8 @@ node_modules/
 portfolio-inner-site/build/
 portfolio-website/dist/
 portfolio-website/public/
+/build/
+/public/
 
 # Env & secrets
 .env
