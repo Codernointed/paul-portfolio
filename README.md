@@ -21,9 +21,10 @@ It is made of **two apps** that run together:
 ## Publishing to GitHub
 
 This project is intended to live under **[github.com/Codernointed](https://github.com/Codernointed)**.
-Create a new repository there (e.g. `paul-portfolio`), then from this folder:
+Create a new repository at [github.com/Codernointed](https://github.com/Codernointed) (e.g. `paul-portfolio`), then from **this project folder** (`paul-portfolio`):
 
 ```bash
+# You should already be in: .../paul-portfolio
 git init
 git add .
 git commit -m "Initial commit: Paul Botchwey interactive portfolio"

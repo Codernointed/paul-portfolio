@@ -1,0 +1,7 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "framework": null,
+    "buildCommand": "NODE_OPTIONS=--openssl-legacy-provider npm run build",
+    "outputDirectory": "public",
+    "installCommand": "npm install"
+}
