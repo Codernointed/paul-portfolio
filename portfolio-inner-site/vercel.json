@@ -3,5 +3,5 @@
     "framework": "create-react-app",
     "buildCommand": "npm run build",
     "outputDirectory": "build",
-    "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+    "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
 }

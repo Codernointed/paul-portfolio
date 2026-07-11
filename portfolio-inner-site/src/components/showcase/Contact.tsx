@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import posthog from 'posthog-js';
 import colors from '../../constants/colors';
 import ghIcon from '../../assets/pictures/contact-gh.png';
 import inIcon from '../../assets/pictures/contact-in.png';
 import ResumeDownload from './ResumeDownload';
+
+const CONTACT_EMAIL = 'botchweypaul0001@gmail.com';
 
 export interface ContactProps {}
 
@@ -46,31 +49,55 @@ const Contact: React.FC<ContactProps> = (props) => {
         }
     }, [email, name, message]);
 
+    function openMailFallback() {
+        const subject = encodeURIComponent(
+            `Portfolio contact from ${name}${company ? ` (${company})` : ''}`
+        );
+        const body = encodeURIComponent(
+            `${message}\n\nFrom ${name}\n${email}${company ? `\n${company}` : ''}`
+        );
+        window.open(
+            `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`,
+            '_blank'
+        );
+    }
+
+    function resetForm() {
+        setCompany('');
+        setEmail('');
+        setName('');
+        setMessage('');
+    }
+
     async function submitForm() {
         if (!isFormValid) {
             setFormMessage('Form unable to validate, please try again.');
             setFormMessageColor('red');
             return;
         }
-        // No backend is wired up: compose the message in the visitor's email
-        // client. To use a hosted service later, swap this for a Formspree or
-        // EmailJS call (see the README in this repo for a quick how-to).
-        const subject = encodeURIComponent(
-            `Portfolio contact from ${name}${company ? ` (${company})` : ''}`
-        );
-        const body = encodeURIComponent(
-            `${message}\n\n— ${name}\n${email}${company ? `\n${company}` : ''}`
-        );
-        window.open(
-            `mailto:botchweypaul0001@gmail.com?subject=${subject}&body=${body}`,
-            '_blank'
-        );
-        setFormMessage(`Thanks ${name}! Opening your email app...`);
+
+        posthog.capture('contact_submitted', { has_company: !!company });
+        setFormMessage(`Sending your message...`);
         setFormMessageColor(colors.blue);
-        setCompany('');
-        setEmail('');
-        setName('');
-        setMessage('');
+
+        try {
+            // Send through the Resend-backed serverless function. If it is not
+            // configured yet (or unreachable, e.g. local dev), fall back to the
+            // visitor's email client so the form always works.
+            const res = await fetch('/api/contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, company, message }),
+            });
+            if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+            setFormMessage(`Thanks ${name}! Your message has been sent.`);
+            setFormMessageColor(colors.blue);
+            resetForm();
+        } catch (err) {
+            openMailFallback();
+            setFormMessage(`Opening your email app to send the message...`);
+            setFormMessageColor(colors.blue);
+        }
     }
 
     useEffect(() => {
@@ -190,7 +217,7 @@ const Contact: React.FC<ContactProps> = (props) => {
                                     <sub>
                                         {formMessage
                                             ? `${formMessage}`
-                                            : ' This opens your email app to send me a message directly'}
+                                            : ' Your message goes straight to my inbox'}
                                     </sub>
                                 </b>
                             </p>
