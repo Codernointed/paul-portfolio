@@ -4,5 +4,8 @@
   "description": "Monorepo router for Vercel Git deploys (inner-site + 3D shell)",
   "scripts": {
     "build": "node scripts/vercel-build.mjs"
+  },
+  "dependencies": {
+    "@vercel/functions": "3.7.5"
   }
 }

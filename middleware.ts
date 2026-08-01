@@ -1,7 +1,10 @@
 import { next, rewrite } from '@vercel/functions';
 
-// Full catch-all: both the initial document and every asset request
-// (from whichever app ends up being served) must pass through here.
+// Vercel's Root Directory for BOTH projects (paul-portfolio and
+// codernointed-os) is this monorepo root (see .vercel/repo.json), so this
+// single middleware runs for both deployments. Behavior is branched on the
+// request's Host header rather than build-time env vars, since env vars set
+// for the build step aren't reliably available at Edge runtime.
 export const config = {
     matcher: '/:path*',
 };
@@ -45,22 +48,29 @@ function posthogProxyTarget(url: URL): URL | null {
     return null;
 }
 
+// The inner-site (codernointed-os) is already the OS content by itself, so
+// it never needs the mobile-redirect-to-itself branch below - only the
+// paul-portfolio (3D shell) deployment does.
+function isInnerSiteHost(host: string): boolean {
+    return host.includes('codernointed-os');
+}
+
 export default function middleware(request: Request) {
     const url = new URL(request.url);
 
-    // Analytics proxy takes priority: applies to every visitor regardless
-    // of device, so PostHog keeps working whether they land on the 3D
-    // shell or get proxied to the OS view below.
+    // Analytics proxy takes priority for every visitor on either project.
     const posthogTarget = posthogProxyTarget(url);
     if (posthogTarget) {
         return rewrite(posthogTarget);
     }
 
-    if (!isMobileRequest(request)) {
+    const host = request.headers.get('host') ?? '';
+    if (isInnerSiteHost(host) || !isMobileRequest(request)) {
         return next({ headers: { Vary: 'User-Agent' } });
     }
 
+    // Mobile visitor on the 3D shell's domain: proxy straight to the OS
+    // content, address bar stays on the shell's own domain.
     const target = new URL(url.pathname + url.search, INNER_SITE_ORIGIN);
-
     return rewrite(target, { headers: { Vary: 'User-Agent' } });
 }
