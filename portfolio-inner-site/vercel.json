@@ -3,5 +3,15 @@
     "framework": "create-react-app",
     "buildCommand": "npm run build",
     "outputDirectory": "build",
-    "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+    "rewrites": [
+        {
+            "source": "/ingest/static/:path*",
+            "destination": "https://eu-assets.i.posthog.com/static/:path*"
+        },
+        {
+            "source": "/ingest/:path*",
+            "destination": "https://eu.i.posthog.com/:path*"
+        },
+        { "source": "/((?!api/).*)", "destination": "/index.html" }
+    ]
 }
