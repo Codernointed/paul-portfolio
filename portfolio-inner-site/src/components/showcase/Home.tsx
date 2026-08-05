@@ -50,14 +50,19 @@ const Home: React.FC<HomeProps> = (props) => {
 
 const styles: StyleSheetCSS = {
     page: {
-        left: 0,
-        right: 0,
-        top: 0,
-        position: 'absolute',
+        // Plain flex child instead of position:absolute + height:'100%' -
+        // the latter needs every ancestor to have an explicitly resolved
+        // height for the percentage to work, which some Android browser
+        // engines don't propagate the same way through .site-page's
+        // absolute-with-inset-zero sizing, letting this content render
+        // outside the window's visible box. flex:1 with the default
+        // align-items:stretch fills the same space without that dependency.
+        flex: 1,
+        width: '100%',
         justifyContent: 'center',
         alignItems: 'center',
         flexDirection: 'column',
-        height: '100%',
+        overflowY: 'auto',
     },
     header: {
         textAlign: 'center',

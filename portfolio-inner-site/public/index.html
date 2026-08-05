@@ -7,6 +7,11 @@
   <meta name="theme-color" content="#000000" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="description" content="" />
+  <!-- Explicitly light: without this, some Android browsers force-invert
+       colors on pages that don't declare a color scheme, which breaks this
+       retro white-background OS look entirely. -->
+  <meta name="color-scheme" content="light only" />
+  <meta name="supported-color-schemes" content="light" />
   <base target="_parent">
   <link rel="stylesheet" href="https://use.typekit.net/llo2eru.css" />
   <link rel="shortcut icon" href="./favicon.ico" type="image/x-icon">
