@@ -13,6 +13,11 @@ import { IconName } from '../../assets/icons';
 import Credits from '../applications/Credits';
 import LiveSites from '../applications/LiveSites';
 import MobileApps from '../applications/MobileApps';
+import useIsMobile from '../../hooks/useIsMobile';
+
+const MOBILE_ICON_COL_WIDTH = 90;
+const MOBILE_ICON_ROW_HEIGHT = 96;
+const MOBILE_ICONS_PER_ROW = 3;
 
 export interface DesktopProps {}
 
@@ -83,6 +88,8 @@ const APPLICATIONS: {
 };
 
 const Desktop: React.FC<DesktopProps> = (props) => {
+    const isMobile = useIsMobile();
+
     const [windows, setWindows] = useState<DesktopWindows>({});
 
     const [shortcuts, setShortcuts] = useState<DesktopShortcutProps[]>([]);
@@ -240,11 +247,25 @@ const Desktop: React.FC<DesktopProps> = (props) => {
             })}
             <div style={styles.shortcuts}>
                 {shortcuts.map((shortcut, i) => {
+                    // Mobile: a wrapped grid so all icons fit above the
+                    // taskbar. Desktop: unchanged single vertical column.
+                    const position = isMobile
+                        ? {
+                              top:
+                                  Math.floor(i / MOBILE_ICONS_PER_ROW) *
+                                  MOBILE_ICON_ROW_HEIGHT,
+                              left:
+                                  (i % MOBILE_ICONS_PER_ROW) *
+                                  MOBILE_ICON_COL_WIDTH,
+                          }
+                        : { top: i * 104 };
                     return (
                         <div
-                            style={Object.assign({}, styles.shortcutContainer, {
-                                top: i * 104,
-                            })}
+                            style={Object.assign(
+                                {},
+                                styles.shortcutContainer,
+                                position
+                            )}
                             key={shortcut.shortcutName}
                         >
                             <DesktopShortcut

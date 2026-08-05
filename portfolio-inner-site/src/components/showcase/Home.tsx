@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link } from '../general';
 import { useNavigate } from 'react-router-dom';
+import useIsMobile from '../../hooks/useIsMobile';
 
 export interface HomeProps {}
 
 const Home: React.FC<HomeProps> = (props) => {
+    const isMobile = useIsMobile();
     const navigate = useNavigate();
 
     const goToContact = () => {
@@ -14,10 +16,14 @@ const Home: React.FC<HomeProps> = (props) => {
     return (
         <div style={styles.page}>
             <div style={styles.header}>
-                <h1 style={styles.name}>Paul Botchwey</h1>
-                <h2>Mobile App Developer · Data Scientist & ML Engineer</h2>
+                <h1 style={isMobile ? styles.nameMobile : styles.name}>
+                    Paul Botchwey
+                </h1>
+                <h2 style={isMobile ? styles.subtitleMobile : undefined}>
+                    Mobile App Developer · Data Scientist & ML Engineer
+                </h2>
             </div>
-            <div style={styles.buttons}>
+            <div style={isMobile ? styles.buttonsMobile : styles.buttons}>
                 <Link containerStyle={styles.link} to="about" text="ABOUT" />
                 <Link
                     containerStyle={styles.link}
@@ -86,6 +92,19 @@ const styles: StyleSheetCSS = {
         fontSize: 72,
         marginBottom: 16,
         lineHeight: 0.9,
+    },
+    nameMobile: {
+        fontSize: 34,
+        marginBottom: 12,
+        lineHeight: 1.05,
+    },
+    subtitleMobile: {
+        fontSize: 14,
+        padding: '0 16px',
+    },
+    buttonsMobile: {
+        flexWrap: 'wrap',
+        justifyContent: 'center',
     },
 };
 

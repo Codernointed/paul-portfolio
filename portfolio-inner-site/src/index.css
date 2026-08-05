@@ -266,6 +266,18 @@ input:active {
     overflow-y: scroll;
 }
 
+@media (max-width: 768px) {
+    .site-page {
+        flex-direction: column;
+    }
+
+    .site-page-content {
+        margin-left: 0;
+        padding: 16px;
+        box-sizing: border-box;
+    }
+}
+
 .router-link:visited {
     color: purple;
 }

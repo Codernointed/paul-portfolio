@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from '../general';
 import { useLocation, useNavigate } from 'react-router-dom';
+import useIsMobile from '../../hooks/useIsMobile';
 
 export interface VerticalNavbarProps {}
 
 const VerticalNavbar: React.FC<VerticalNavbarProps> = (props) => {
+    const isMobile = useIsMobile();
     const location = useLocation();
     const [projectsExpanded, setProjectsExpanded] = useState(false);
     const [isHome, setIsHome] = useState(false);
@@ -28,26 +30,31 @@ const VerticalNavbar: React.FC<VerticalNavbarProps> = (props) => {
         return () => {};
     }, [location.pathname]);
 
+    const linkStyle = isMobile ? styles.linkMobile : styles.link;
+    const insetLinkStyle = isMobile ? styles.insetLinkMobile : styles.insetLink;
+
     return !isHome ? (
-        <div style={styles.navbar}>
-            <div style={styles.header}>
-                <h1 style={styles.headerText}>Paul</h1>
-                <h1 style={styles.headerText}>Botchwey</h1>
-                <h3 style={styles.headerShowcase}>Showcase '26</h3>
-            </div>
-            <div style={styles.links}>
-                <Link containerStyle={styles.link} to="" text="HOME" />
-                <Link containerStyle={styles.link} to="about" text="ABOUT" />
+        <div style={isMobile ? styles.navbarMobile : styles.navbar}>
+            {!isMobile && (
+                <div style={styles.header}>
+                    <h1 style={styles.headerText}>Paul</h1>
+                    <h1 style={styles.headerText}>Botchwey</h1>
+                    <h3 style={styles.headerShowcase}>Showcase '26</h3>
+                </div>
+            )}
+            <div style={isMobile ? styles.linksMobile : styles.links}>
+                <Link containerStyle={linkStyle} to="" text="HOME" />
+                <Link containerStyle={linkStyle} to="about" text="ABOUT" />
                 <Link
-                    containerStyle={styles.link}
+                    containerStyle={linkStyle}
                     to="experience"
                     text="EXPERIENCE"
                 />
                 <Link
                     containerStyle={Object.assign(
                         {},
-                        styles.link,
-                        projectsExpanded && styles.expandedLink
+                        linkStyle,
+                        !isMobile && projectsExpanded && styles.expandedLink
                     )}
                     to="projects"
                     text="PROJECTS"
@@ -55,35 +62,42 @@ const VerticalNavbar: React.FC<VerticalNavbarProps> = (props) => {
                 {
                     // if current path contains projects
                     projectsExpanded && (
-                        <div style={styles.insetLinks}>
+                        <div
+                            style={
+                                isMobile
+                                    ? styles.insetLinksMobile
+                                    : styles.insetLinks
+                            }
+                        >
                             <Link
-                                containerStyle={styles.insetLink}
+                                containerStyle={insetLinkStyle}
                                 to="projects/mobile"
                                 text="MOBILE"
                             />
                             <Link
-                                containerStyle={styles.insetLink}
+                                containerStyle={insetLinkStyle}
                                 to="projects/web"
                                 text="WEB"
                             />
                             <Link
-                                containerStyle={styles.insetLink}
+                                containerStyle={insetLinkStyle}
                                 to="projects/data"
                                 text="DATA SCIENCE"
                             />
                         </div>
                     )
                 }
-                <Link
-                    containerStyle={styles.link}
-                    to="contact"
-                    text="CONTACT"
-                />
+                <Link containerStyle={linkStyle} to="contact" text="CONTACT" />
             </div>
-            <div style={styles.spacer} />
-            <div style={styles.forHireContainer} onMouseDown={goToContact}>
-                {/* <img src={forHire} style={styles.image} alt="" /> */}
-            </div>
+            {!isMobile && (
+                <>
+                    <div style={styles.spacer} />
+                    <div
+                        style={styles.forHireContainer}
+                        onMouseDown={goToContact}
+                    />
+                </>
+            )}
         </div>
     ) : (
         <></>
@@ -99,6 +113,34 @@ const styles: StyleSheetCSS = {
         boxSizing: 'border-box',
         position: 'fixed',
         overflow: 'hidden',
+    },
+    navbarMobile: {
+        width: '100%',
+        flexDirection: 'row',
+        padding: 12,
+        boxSizing: 'border-box',
+        position: 'relative',
+        borderBottom: '1px solid #86898d',
+        flexShrink: 0,
+    },
+    linksMobile: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+    },
+    linkMobile: {
+        marginRight: 16,
+        marginBottom: 4,
+    },
+    insetLinksMobile: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginRight: 8,
+        marginBottom: 4,
+    },
+    insetLinkMobile: {
+        marginRight: 12,
+        marginBottom: 4,
     },
     header: {
         flexDirection: 'column',

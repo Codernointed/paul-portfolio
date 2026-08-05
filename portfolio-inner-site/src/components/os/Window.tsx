@@ -6,6 +6,9 @@ import Icon from '../general/Icon';
 import Button from './Button';
 import DragIndicator from './DragIndicator';
 import ResizeIndicator from './ResizeIndicator';
+import useIsMobile from '../../hooks/useIsMobile';
+
+const MOBILE_TASKBAR_HEIGHT = 32;
 
 export interface WindowProps {
     closeWindow: () => void;
@@ -25,6 +28,8 @@ export interface WindowProps {
 }
 
 const Window: React.FC<WindowProps> = (props) => {
+    const isMobile = useIsMobile();
+
     const windowRef = useRef<any>(null);
     const dragRef = useRef<any>(null);
     const contentRef = useRef<any>(null);
@@ -61,6 +66,7 @@ const Window: React.FC<WindowProps> = (props) => {
     const [isResizing, setIsResizing] = useState(false);
 
     const startResize = (event: any) => {
+        if (isMobile) return;
         event.preventDefault();
         setIsResizing(true);
         window.addEventListener('mousemove', onResize, false);
@@ -85,6 +91,7 @@ const Window: React.FC<WindowProps> = (props) => {
     };
 
     const startDrag = (event: any) => {
+        if (isMobile) return;
         const { clientX, clientY } = event;
         setIsDragging(true);
         event.preventDefault();
@@ -189,21 +196,35 @@ const Window: React.FC<WindowProps> = (props) => {
         lastClickInside.current = true;
     };
 
+    // On mobile every window goes edge-to-edge (minus the taskbar) instead
+    // of at whatever fixed desktop size/position each app was given -
+    // dragging/resizing is disabled above since there's nowhere to move to.
+    const renderWidth = isMobile ? window.innerWidth : width;
+    const renderHeight = isMobile
+        ? window.innerHeight - MOBILE_TASKBAR_HEIGHT
+        : height;
+    const renderTop = isMobile ? 0 : top;
+    const renderLeft = isMobile ? 0 : left;
+
     return (
         <div onMouseDown={onWindowInteract} style={styles.container}>
             <div
                 style={Object.assign({}, styles.window, {
-                    width,
-                    height,
-                    top,
-                    left,
+                    width: renderWidth,
+                    height: renderHeight,
+                    top: renderTop,
+                    left: renderLeft,
                 })}
                 ref={windowRef}
             >
                 <div style={styles.windowBorderOuter}>
                     <div style={styles.windowBorderInner}>
                         <div
-                            style={styles.dragHitbox}
+                            style={
+                                isMobile
+                                    ? { display: 'none' }
+                                    : styles.dragHitbox
+                            }
                             onMouseDown={startDrag}
                         ></div>
                         <div
@@ -271,7 +292,11 @@ const Window: React.FC<WindowProps> = (props) => {
                         </div>
                         <div
                             onMouseDown={startResize}
-                            style={styles.resizeHitbox}
+                            style={
+                                isMobile
+                                    ? { display: 'none' }
+                                    : styles.resizeHitbox
+                            }
                         ></div>
                         <div style={styles.bottomBar}>
                             <div
@@ -437,8 +462,8 @@ const styles: StyleSheetCSS = {
         flex: 1,
 
         position: 'relative',
-        // overflow: 'scroll',
         overflowX: 'hidden',
+        overflowY: 'auto',
         backgroundColor: Colors.white,
     },
     bottomBar: {
