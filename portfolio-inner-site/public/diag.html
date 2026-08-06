@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light only" />
+  <title>Viewport diagnostics</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: -apple-system, system-ui, sans-serif;
+      background: #fff;
+      color: #111;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin: 0 0 4px;
+    }
+
+    p.sub {
+      margin: 0 0 16px;
+      color: #555;
+      font-size: 13px;
+    }
+
+    .verdict {
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+
+    .good {
+      background: #d8f5d8;
+      border: 2px solid #2b8a2b;
+      color: #14521a;
+    }
+
+    .bad {
+      background: #ffdede;
+      border: 2px solid #c22;
+      color: #7a1111;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 14px;
+    }
+
+    td {
+      border-bottom: 1px solid #ddd;
+      padding: 8px 6px;
+      vertical-align: top;
+    }
+
+    td.k {
+      color: #555;
+      width: 45%;
+    }
+
+    td.v {
+      font-weight: 700;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      word-break: break-all;
+    }
+
+    .ruler {
+      margin-top: 20px;
+      height: 26px;
+      background: repeating-linear-gradient(to right, #2b6cb0 0 50px, #90cdf4 50px 100px);
+      border: 1px solid #333;
+    }
+
+    .rulerlabel {
+      font-size: 12px;
+      color: #555;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Viewport diagnostics</h1>
+  <p class="sub">Screenshot this whole page and send it back.</p>
+  <div id="verdict" class="verdict"></div>
+  <table id="out"></table>
+  <div class="ruler"></div>
+  <p class="rulerlabel">The bar above is exactly 100% wide. Each colour band is 50 CSS pixels.</p>
+
+  <script>
+    var rows = [
+      ['window.innerWidth', window.innerWidth],
+      ['window.innerHeight', window.innerHeight],
+      ['document.documentElement.clientWidth', document.documentElement.clientWidth],
+      ['screen.width', window.screen ? window.screen.width : 'n/a'],
+      ['screen.height', window.screen ? window.screen.height : 'n/a'],
+      ['devicePixelRatio', window.devicePixelRatio],
+      ['visualViewport.width', window.visualViewport ? Math.round(window.visualViewport.width) : 'n/a'],
+      ['visualViewport.scale', window.visualViewport ? window.visualViewport.scale : 'n/a'],
+      ['matchMedia(max-width:768px)', window.matchMedia('(max-width: 768px)').matches],
+      ['navigator.maxTouchPoints', navigator.maxTouchPoints],
+      ['in an iframe?', window.self !== window.top],
+      ['userAgent', navigator.userAgent]
+    ];
+
+    var isMobile = window.innerWidth < 768;
+    var v = document.getElementById('verdict');
+    if (isMobile) {
+      v.className = 'verdict good';
+      v.textContent = 'MOBILE layout (innerWidth ' + window.innerWidth + ' is under 768). This is what we want.';
+    } else {
+      v.className = 'verdict bad';
+      v.textContent = 'DESKTOP layout (innerWidth ' + window.innerWidth +
+        ' is 768 or more). The browser is reporting a wide screen, which is why the site looks broken here.';
+    }
+
+    var t = document.getElementById('out');
+    for (var i = 0; i < rows.length; i++) {
+      var tr = document.createElement('tr');
+      var td1 = document.createElement('td');
+      td1.className = 'k';
+      td1.textContent = rows[i][0];
+      var td2 = document.createElement('td');
+      td2.className = 'v';
+      td2.textContent = String(rows[i][1]);
+      tr.appendChild(td1);
+      tr.appendChild(td2);
+      t.appendChild(tr);
+    }
+  </script>
+</body>
+
+</html>
