@@ -50,6 +50,56 @@
       });
     };
   </script>
+  <!-- Layout debug overlay. Only runs when ?debug=1 is in the URL. -->
+  <script>
+    if (location.search.indexOf('debug') >= 0) {
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          function rect(label, el) {
+            if (!el) return label + ': MISSING';
+            var b = el.getBoundingClientRect();
+            return label + ': x=' + Math.round(b.left) + ' y=' + Math.round(b.top) +
+              ' w=' + Math.round(b.width) + ' h=' + Math.round(b.height);
+          }
+          var winBox = null;
+          var divs = document.querySelectorAll('div');
+          for (var i = 0; i < divs.length; i++) {
+            var s = divs[i].getAttribute('style') || '';
+            if (s.indexOf('position: absolute') >= 0 && s.indexOf('background-color') >= 0 &&
+              divs[i].offsetWidth > 150) { winBox = divs[i]; break; }
+          }
+          var icons = document.querySelectorAll('[id^="desktop-shortcut-"]');
+          var seen = {}, iconPos = [];
+          for (var j = 0; j < icons.length && iconPos.length < 4; j++) {
+            var id = icons[j].id;
+            if (seen[id]) continue;
+            seen[id] = 1;
+            var ib = icons[j].getBoundingClientRect();
+            iconPos.push(Math.round(ib.left) + ',' + Math.round(ib.top));
+          }
+          var de = document.documentElement;
+          var lines = [
+            'innerW=' + window.innerWidth + ' innerH=' + window.innerHeight + ' dpr=' + window.devicePixelRatio,
+            'isMobile SHOULD BE: ' + (window.innerWidth < 768),
+            'doc scrollW=' + de.scrollWidth + ' scrollH=' + de.scrollHeight,
+            'vv.scale=' + (window.visualViewport ? window.visualViewport.scale : 'n/a'),
+            rect('.App', document.querySelector('.App')),
+            rect('windowBox', winBox),
+            rect('.site-page', document.querySelector('.site-page')),
+            rect('.site-page-content', document.querySelector('.site-page-content')),
+            'icons(first4): ' + iconPos.join('  |  ')
+          ];
+          var box = document.createElement('div');
+          box.setAttribute('style',
+            'position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b00;color:#fff;' +
+            'font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;padding:6px 8px;white-space:pre-wrap;' +
+            'display:block;box-sizing:border-box;');
+          box.textContent = lines.join('\n');
+          document.body.appendChild(box);
+        }, 1800);
+      });
+    }
+  </script>
   <script src="%PUBLIC_URL%/js-dos/js-dos.js"></script>
   <link rel="stylesheet" href="%PUBLIC_URL%/js-dos/js-dos.css">
   <script>
