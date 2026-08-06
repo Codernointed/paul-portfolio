@@ -9,6 +9,11 @@ import ResizeIndicator from './ResizeIndicator';
 import useViewport from '../../hooks/useViewport';
 
 const MOBILE_TASKBAR_HEIGHT = 32;
+// Inset the window on mobile so the desktop is visible around it and it reads
+// as a window the user can minimize or close. MOBILE_SIDE_MARGIN controls the
+// left/right gap; MOBILE_TOP_MARGIN is a little taller so icons peek above.
+const MOBILE_SIDE_MARGIN = 10;
+const MOBILE_TOP_MARGIN = 28;
 
 export interface WindowProps {
     closeWindow: () => void;
@@ -200,15 +205,17 @@ const Window: React.FC<WindowProps> = (props) => {
         lastClickInside.current = true;
     };
 
-    // On mobile every window goes edge-to-edge (minus the taskbar) instead
-    // of at whatever fixed desktop size/position each app was given -
-    // dragging/resizing is disabled above since there's nowhere to move to.
-    const renderWidth = isMobile ? viewportWidth : width;
+    // On mobile every window fills the screen minus the taskbar and a small
+    // margin, instead of whatever fixed desktop size/position each app was
+    // given. Dragging/resizing is disabled above since there's nowhere to
+    // move to; the margin keeps the desktop visible behind the window so it
+    // still reads as a window with minimize/close controls.
+    const renderWidth = isMobile ? viewportWidth - MOBILE_SIDE_MARGIN * 2 : width;
     const renderHeight = isMobile
-        ? viewportHeight - MOBILE_TASKBAR_HEIGHT
+        ? viewportHeight - MOBILE_TASKBAR_HEIGHT - MOBILE_TOP_MARGIN - MOBILE_SIDE_MARGIN
         : height;
-    const renderTop = isMobile ? 0 : top;
-    const renderLeft = isMobile ? 0 : left;
+    const renderTop = isMobile ? MOBILE_TOP_MARGIN : top;
+    const renderLeft = isMobile ? MOBILE_SIDE_MARGIN : left;
 
     return (
         <div onMouseDown={onWindowInteract} style={styles.container}>
