@@ -13,6 +13,11 @@ body {
     height: 100%;
     margin: 0;
     overflow: hidden;
+    /* Hard cap: any element wider than the screen makes Chrome on Android
+       expand the layout viewport, which desyncs window.innerWidth from the
+       CSS viewport and silently disables every mobile breakpoint. */
+    max-width: 100%;
+    overflow-x: hidden;
 }
 
 div {

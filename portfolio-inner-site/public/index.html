@@ -110,7 +110,14 @@
 <body>
   <noscript>You need to enable JavaScript to run this app.</noscript>
   <!-- THIS IS A HACK AND A HALF but I dont care -->
-  <div class="font_preload" style="opacity: 0; position: absolute; pointer-events: none;">
+  <!-- Fonts are preloaded by rendering them once, offscreen. This MUST stay
+       zero-sized with overflow hidden: a global "div { display: flex }" rule
+       lays these spans out in a row (~873px), and that overflow makes Chrome
+       on Android expand the layout viewport, so window.innerWidth reports
+       ~873 on a 360px phone and every mobile breakpoint silently fails.
+       Keep it rendered (not display:none) or the fonts never load. -->
+  <div class="font_preload"
+    style="opacity: 0; position: absolute; pointer-events: none; width: 0; height: 0; overflow: hidden; top: 0; left: 0;">
     <span style="font-family: 'MSSerif', Arial, sans-serif;">abcdefghijklmnopqrstuvwxzy</span>
     <span style="font-family: 'Millennium', Arial, sans-serif;">abcdefghijklmnopqrstuvwxzy</span>
     <span style="font-family: 'MillenniumBold', Arial, sans-serif;">abcdefghijklmnopqrstuvwxzy</span>

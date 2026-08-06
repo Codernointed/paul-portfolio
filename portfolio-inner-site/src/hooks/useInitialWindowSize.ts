@@ -1,13 +1,11 @@
-// import { useState, useCallback } from 'react';
+import { getViewportSize } from './useViewport';
 
 export default function useInitialWindowSize({ margin }: { margin?: number }) {
-    let m = margin || 0;
+    const m = margin || 0;
 
-    const winW = window.innerWidth;
-    const winH = window.innerHeight;
+    // Uses the CSS viewport, not window.innerWidth - see useViewport.ts for
+    // why those two can disagree on Android.
+    const { width, height } = getViewportSize();
 
-    let initWidth = winW - m;
-    let initHeight = winH - m;
-
-    return { initWidth, initHeight };
+    return { initWidth: width - m, initHeight: height - m };
 }

@@ -6,7 +6,7 @@ import Icon from '../general/Icon';
 import Button from './Button';
 import DragIndicator from './DragIndicator';
 import ResizeIndicator from './ResizeIndicator';
-import useIsMobile from '../../hooks/useIsMobile';
+import useViewport from '../../hooks/useViewport';
 
 const MOBILE_TASKBAR_HEIGHT = 32;
 
@@ -28,7 +28,11 @@ export interface WindowProps {
 }
 
 const Window: React.FC<WindowProps> = (props) => {
-    const isMobile = useIsMobile();
+    const {
+        width: viewportWidth,
+        height: viewportHeight,
+        isMobile,
+    } = useViewport();
 
     const windowRef = useRef<any>(null);
     const dragRef = useRef<any>(null);
@@ -199,9 +203,9 @@ const Window: React.FC<WindowProps> = (props) => {
     // On mobile every window goes edge-to-edge (minus the taskbar) instead
     // of at whatever fixed desktop size/position each app was given -
     // dragging/resizing is disabled above since there's nowhere to move to.
-    const renderWidth = isMobile ? window.innerWidth : width;
+    const renderWidth = isMobile ? viewportWidth : width;
     const renderHeight = isMobile
-        ? window.innerHeight - MOBILE_TASKBAR_HEIGHT
+        ? viewportHeight - MOBILE_TASKBAR_HEIGHT
         : height;
     const renderTop = isMobile ? 0 : top;
     const renderLeft = isMobile ? 0 : left;
