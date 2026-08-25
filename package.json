@@ -3,7 +3,10 @@
   "private": true,
   "description": "Monorepo router for Vercel Git deploys (inner-site + 3D shell)",
   "scripts": {
-    "build": "node scripts/vercel-build.mjs"
+    "build": "node scripts/vercel-build.mjs",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "generate": "node scripts/generate-agent-files.mjs",
+    "preview": "node scripts/preview-server.mjs"
   },
   "dependencies": {
     "@vercel/functions": "3.7.5"

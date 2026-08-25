@@ -64,16 +64,119 @@
       top: 0;
       pointer-events: none;
     }
+
+    /* The readable copy of the page. It ships in the raw HTML for crawlers,
+       agents and screen readers, and is visually hidden (never display:none,
+       which assistive tech and some crawlers skip) so the 3D scene looks
+       exactly as it always has. The <noscript> block below un-hides it for
+       visitors without JavaScript, who would otherwise see a blank canvas. */
+    .agent-content {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
   </style>
 
-  <!-- Primary Meta Tags -->
-  <title>Paul Botchwey - Portfolio 2026</title>
+  <noscript>
+    <style>
+      /* Without JavaScript there is no 3D scene, so the readable block becomes
+         the page. main.css (the scene's UI stylesheet) sets white text and a
+         hidden overflow on everything, so both are overridden here. */
+      html,
+      body {
+        overflow: auto;
+        background-color: #fff;
+      }
+
+      .agent-content {
+        position: static;
+        width: auto;
+        max-width: 44rem;
+        height: auto;
+        margin: 0 auto;
+        padding: 48px 20px;
+        overflow: visible;
+        clip: auto;
+        clip-path: none;
+        white-space: normal;
+        background-color: #fff;
+        color: #111;
+        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      }
+
+      .agent-content h1,
+      .agent-content h2,
+      .agent-content h3,
+      .agent-content p,
+      .agent-content li,
+      .agent-content a {
+        font-family: inherit;
+        font-size: 1rem;
+        font-weight: 400;
+        color: #111;
+      }
+
+      .agent-content h1 {
+        font-size: 1.7rem;
+        font-weight: 700;
+        line-height: 1.25;
+        margin: 0 0 .75rem;
+      }
+
+      .agent-content h2 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin: 2rem 0 .5rem;
+      }
+
+      .agent-content h3 {
+        font-weight: 700;
+        margin: 1.5rem 0 .5rem;
+      }
+
+      .agent-content p {
+        margin: 0 0 1rem;
+      }
+
+      .agent-content ul {
+        margin: 0 0 1rem;
+        padding-left: 1.25rem;
+        list-style: disc;
+      }
+
+      .agent-content li {
+        display: list-item;
+        margin: 0 0 .35rem;
+      }
+
+      .agent-content a {
+        color: #00007b;
+        text-decoration: underline;
+      }
+    </style>
+  </noscript>
+
+  <!-- Primary Meta Tags. The per-route pages (/about.html, /contact.html, ...)
+       are generated from these by scripts/generate-agent-files.mjs after the
+       webpack build, which rewrites the title, description, canonical,
+       Open Graph tags, JSON-LD and the #agent-content block below. Keep those
+       tags' shape (attribute order and quoting) intact or the generator will
+       fail the build loudly. -->
+  <title>Paul Botchwey - Mobile App Developer, Data Scientist & ML Engineer</title>
   <meta name="title" content="Paul Botchwey - Mobile App Developer, Data Scientist & ML Engineer">
   <meta name="description"
     content="I'm Paul Botchwey (Codernointed), a Mobile App Developer, Data Scientist & ML Engineer based in Accra, Ghana. Explore my interactive portfolio.">
+  <link rel="canonical" href="https://paulbotchwey.com/">
+  <link rel="alternate" type="text/markdown" href="/index.md">
 
   <!-- Open Graph / Facebook -->
-  <!-- TODO: update the og:url / twitter:url below to your real domain once deployed -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://paulbotchwey.com/">
   <meta property="og:title" content="Paul Botchwey - Mobile App Developer, Data Scientist & ML Engineer">
