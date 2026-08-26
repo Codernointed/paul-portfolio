@@ -6,7 +6,7 @@
     },
     "scripts": {
         "start": "node server/index.ts",
-        "build": "webpack --config ./bundler/webpack.prod.js",
+        "build": "webpack --config ./bundler/webpack.prod.js && node ../scripts/generate-agent-files.mjs",
         "dev": "webpack serve --config ./bundler/webpack.dev.js"
     },
     "dependencies": {

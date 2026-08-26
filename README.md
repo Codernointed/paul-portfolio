@@ -95,6 +95,60 @@ Domain **paulbotchwey.com** is attached to `paul-portfolio`. DNS uses Vercel nam
 
 ---
 
+## The agent-readable surface
+
+The site is a WebGL scene wrapped around an iframe, so on its own it gives a
+crawler almost nothing: one app shell, no text, and a rewrite that answered
+`200 OK` for every path. The `site/` + `scripts/` pair fixes that without
+touching how the portfolio looks or behaves.
+
+| Where | What it does |
+|-------|--------------|
+| `site/site-meta.mjs` | Identity (name, email, location, profiles) and the route table: clean path → generated HTML file → markdown twin. Single source of truth. |
+| `site/page-content.mjs` | The readable copy for every route, authored once as structured blocks. Mirrors the OS windows in `portfolio-inner-site/src/components/showcase/` — **keep the two in sync**. |
+| `site/render.mjs` | Renders those blocks to HTML and markdown, and builds the schema.org JSON-LD graph. |
+| `site/request-router.mjs` | All routing decisions (404s, markdown negotiation, the mobile proxy), as pure functions. |
+| `middleware.ts` | Thin edge wrapper that turns a router decision into a Vercel response. |
+| `scripts/generate-agent-files.mjs` | Post-build step: one HTML page per route, the `.md` twins, `llms.txt`, `llms-full.txt`, `agents.md`, `sitemap.xml`, `robots.txt`, `404.html`. |
+| `scripts/preview-server.mjs` | Local stand-in for the Vercel edge + static layer, so the endpoints can be checked without deploying. |
+
+What that produces on `paulbotchwey.com`:
+
+- **Real 404s.** Unknown paths return HTTP 404 with a short markdown body
+  pointing at the sitemap and `llms.txt` (HTML for browsers). No path answers
+  `200` with the app shell any more.
+- **Readable without JavaScript.** Every page ships its full text in the raw
+  HTML inside a visually hidden `#agent-content` block, which the `<noscript>`
+  stylesheet turns into a plain readable page for visitors without JS. The 3D
+  scene is pixel-identical.
+- **Markdown content negotiation** ([acceptmarkdown.com](https://acceptmarkdown.com)).
+  `Accept: text/markdown` on any page returns the `.md` twin with
+  `Vary: Accept, Accept-Encoding, User-Agent` and a `Link: …rel="alternate"`
+  header. Appending `.md` to a path works too.
+- **Structured data.** `Person` + `Organization` (with `contactPoint` and a
+  `PostalAddress`) + `WebSite` + `WebPage`, as JSON-LD, on every page.
+- **Crawlers are never proxied to the OS deployment.** That origin is
+  deliberately `noindex`; bot user agents (Googlebot Smartphone included) get
+  the shell HTML instead of a `noindex` page.
+
+```bash
+npm test                    # 46 tests: routing, generated files, live endpoints
+npm run generate            # regenerate the agent files over an existing build
+npm run preview             # serve portfolio-website/public exactly as Vercel does
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4173/nope   # 404
+curl -s -H 'Accept: text/markdown' http://localhost:4173/about        # markdown
+```
+
+The generator runs automatically as part of `npm run build` in
+`portfolio-website`. It rewrites specific tags in the webpack-generated
+`index.html`; if one of them is renamed or removed the build fails loudly
+rather than shipping a page with a stale canonical URL.
+
+Content changes go in `site/page-content.mjs`; when copy changes, bump
+`SITE.updated` in `site/site-meta.mjs` so `<lastmod>` moves with it.
+
+---
+
 ## Things to personalize
 
 - **Résumé:** `portfolio-inner-site/src/assets/resume/Paul_Botchwey_Resume.pdf`
@@ -109,8 +163,9 @@ Domain **paulbotchwey.com** is attached to `paul-portfolio`. DNS uses Vercel nam
   hosted form service, replace the `submitForm` body in
   `portfolio-inner-site/src/components/showcase/Contact.tsx` with a Formspree or
   EmailJS call.
-- **Meta tags / domain:** update the `TODO` URLs in
-  `portfolio-website/src/index.html` once you have a domain, and add a preview
-  image.
+- **Identity for agents:** name, email, location and social profiles live in
+  `SITE` in `site/site-meta.mjs`. A phone number and street address are the two
+  fields Organization schema can still take; add them there if you want them
+  public.
 - **Analytics:** add your own GA4 ID in
   `portfolio-website/src/index.html` if you want it.
