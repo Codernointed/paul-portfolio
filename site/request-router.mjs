@@ -40,6 +40,42 @@ const FILE_EXTENSION_REGEX = /\.[a-z0-9]{1,8}$/i;
 
 const PASSTHROUGH_PREFIXES = ['/api/', '/.well-known/', '/js-dos/'];
 
+// Extensions the router never attaches meaningful headers to - a static
+// asset path always falls through to `next` with, at most, a Vary header
+// that has no real effect on a binary response (nothing content-negotiates
+// an image, video, font, or compiled bundle by Accept or User-Agent). These
+// are the two deployments' actual asset extensions - see
+// `middleware.ts`'s `config.matcher`, which skips these entirely so the
+// edge function doesn't run per-request on every model, texture, video and
+// bundle chunk. `.md` is deliberately absent: it is the one extension that
+// gets a real header override (Content-Type: text/markdown, the
+// acceptmarkdown.com fix), so it must keep going through the router.
+export const MIDDLEWARE_SKIPPED_EXTENSIONS = [
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'svg',
+    'webp',
+    'avif',
+    'ico',
+    'mp4',
+    'mp3',
+    'wav',
+    'ogg',
+    'glb',
+    'gltf',
+    'drc',
+    'wasm',
+    'js',
+    'css',
+    'map',
+    'jsdos',
+    'symbols',
+    'json',
+    'ts',
+];
+
 function header(headers, name) {
     if (!headers) return '';
     if (typeof headers.get === 'function') return headers.get(name) ?? '';
