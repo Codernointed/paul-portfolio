@@ -8,9 +8,17 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { MIDDLEWARE_SKIPPED_EXTENSIONS } from '../site/request-router.mjs';
 import { ROUTES, AGENT_FILES } from '../site/site-meta.mjs';
+
+const MIDDLEWARE_SOURCE = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '../middleware.ts'),
+    'utf8'
+);
 
 // Mirrors middleware.ts's config.matcher exactly.
 const PAGE_PATTERN = new RegExp(
@@ -86,4 +94,36 @@ test('.xml, .txt and .html stay matched (low traffic, no reason to special-case)
     assert.ok(isMatched('/robots.txt'));
     assert.ok(isMatched('/llms.txt'));
     assert.ok(isMatched('/404.html'));
+});
+
+// Vercel statically parses config.matcher at build time, without executing
+// any code - it must be a plain array of string literals. A computed value
+// (a template literal interpolating an imported constant, a function call)
+// breaks that static analysis and fails the build. This broke the
+// codernointed-os production deploy once already: config.matcher's second
+// entry was built from MIDDLEWARE_SKIPPED_EXTENSIONS via a template
+// literal instead of being written out as a literal string.
+test("middleware.ts's matcher is a hand-written literal, not a computed value", () => {
+    const configBlock = MIDDLEWARE_SOURCE.match(
+        /export const config = \{[\s\S]*?\n};/
+    )?.[0];
+    assert.ok(configBlock, "middleware.ts must export a literal `config` object");
+
+    assert.ok(!configBlock.includes('${'), 'config.matcher must contain no template-literal interpolation');
+    assert.ok(!configBlock.includes('.join('), 'config.matcher must not call .join() at runtime');
+    assert.ok(!configBlock.includes('MIDDLEWARE_SKIPPED_EXTENSIONS'), 'config.matcher must not reference an imported constant');
+});
+
+test("middleware.ts's hand-written matcher literal stays in sync with MIDDLEWARE_SKIPPED_EXTENSIONS", () => {
+    // MIDDLEWARE_SOURCE is raw, unparsed file text: a literal backslash in
+    // the *string value* middleware.ts's matcher evaluates to is written as
+    // two backslash characters in that source text (JS escaping). Building
+    // the expected snippet with a plain template literal here would give a
+    // parsed value (one backslash), not source text (two) - hence \\\\.
+    const expectedPattern = `/((?!.*\\\\.(?:${MIDDLEWARE_SKIPPED_EXTENSIONS.join('|')})$).*)`;
+    assert.ok(
+        MIDDLEWARE_SOURCE.includes(`'${expectedPattern}'`),
+        "middleware.ts's matcher literal must match MIDDLEWARE_SKIPPED_EXTENSIONS exactly - " +
+            'update the hand-written string in middleware.ts when that list changes'
+    );
 });
