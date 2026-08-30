@@ -1,5 +1,5 @@
 import { next, rewrite } from '@vercel/functions';
-import { MIDDLEWARE_SKIPPED_EXTENSIONS, routeRequest } from './site/request-router.mjs';
+import { routeRequest } from './site/request-router.mjs';
 
 // Vercel's Root Directory for BOTH projects (paul-portfolio and
 // codernointed-os) is this monorepo root (see .vercel/repo.json), so this
@@ -18,13 +18,24 @@ import { MIDDLEWARE_SKIPPED_EXTENSIONS, routeRequest } from './site/request-rout
 // static/3D site: most requests are large binary assets (textures, models,
 // video, the JS bundle) that the router does nothing to but attach a Vary
 // header with no real effect on a binary response - see
-// MIDDLEWARE_SKIPPED_EXTENSIONS for the reasoning and the exact list. Page
-// routes (extensionless), the PostHog ingest proxy, and .md (the one
-// extension that gets a real Content-Type override) all stay matched.
+// MIDDLEWARE_SKIPPED_EXTENSIONS in site/request-router.mjs for the reasoning
+// and the canonical extension list. Page routes (extensionless), the
+// PostHog ingest proxy, and .md (the one extension that gets a real
+// Content-Type override) all stay matched.
+//
+// IMPORTANT: Vercel statically parses `matcher` at build time, without
+// executing any code - it must be a plain array of string literals. A value
+// computed at runtime (a template literal interpolating an imported
+// constant, a function call, a variable) breaks that static analysis and
+// fails the build; this exact mistake broke the codernointed-os production
+// deploy once already. The pattern below is hand-written from
+// MIDDLEWARE_SKIPPED_EXTENSIONS; test/middleware-matcher.test.mjs asserts
+// the two stay in sync, and separately asserts this config block contains
+// no computed expression.
 export const config = {
     matcher: [
         '/ingest/:path*',
-        `/((?!.*\\.(?:${MIDDLEWARE_SKIPPED_EXTENSIONS.join('|')})$).*)`,
+        '/((?!.*\\.(?:jpg|jpeg|png|gif|svg|webp|avif|ico|mp4|mp3|wav|ogg|glb|gltf|drc|wasm|js|css|map|jsdos|symbols|json|ts)$).*)',
     ],
 };
 
