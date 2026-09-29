@@ -14,7 +14,7 @@ import {
     readCookie,
     routeRequest,
 } from '../site/request-router.mjs';
-import { ROUTES } from '../site/site-meta.mjs';
+import { AGENT_FILES, ROUTES } from '../site/site-meta.mjs';
 
 const SHELL = 'https://paulbotchwey.com';
 const DESKTOP_UA =
@@ -279,4 +279,24 @@ test('an unrelated cookie alongside a garbage view value does not override the d
         cookie: 'analytics_id=xyz; view=bogus',
     });
     assert.equal(action.kind, 'rewrite', 'an unrecognised view value must not force the OS proxy');
+});
+
+// Real production gap: a mobile visitor (or an automated tool with a
+// mobile-shaped UA that isBotRequest doesn't recognise) requesting one of
+// the generated agent/SEO files used to get proxied to the OS deployment,
+// which doesn't have most of them (404) and, for /robots.txt specifically,
+// has a *different* file entirely - silently defeating the whole point of
+// publishing these for agents.
+test('mobile visitors get the shell\'s own agent/SEO files, never proxied to the OS', () => {
+    for (const path of Object.values(AGENT_FILES)) {
+        const action = get(path, { accept: '*/*', 'user-agent': MOBILE_UA });
+        assert.notEqual(action.kind, 'proxy', `${path} must not be proxied to the OS`);
+    }
+});
+
+test('a view=os cookie does not proxy the agent/SEO files either', () => {
+    for (const path of Object.values(AGENT_FILES)) {
+        const action = get(path, { accept: '*/*', 'user-agent': DESKTOP_UA, cookie: 'view=os' });
+        assert.notEqual(action.kind, 'proxy', `${path} must not be proxied to the OS`);
+    }
 });
