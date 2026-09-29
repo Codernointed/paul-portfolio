@@ -156,3 +156,65 @@ test('mobile visitors are still proxied to the OS deployment', async () => {
         'https://codernointed-os.vercel.app/'
     );
 });
+
+const MOBILE = {
+    ...BROWSER,
+    'user-agent':
+        'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36',
+};
+
+test('the view toggle round-trips: mobile can switch to 3D and back to 2D', async () => {
+    // Starting point: mobile gets proxied to the OS, as always.
+    const before = await get('/', MOBILE);
+    assert.equal(before.headers.get('x-preview-proxy-to'), 'https://codernointed-os.vercel.app/');
+
+    // Click "3D view": the toggle sets a cookie and redirects home.
+    const toggleOn = await fetch(`${base}/__view/3d?to=%2Fabout`, {
+        headers: MOBILE,
+        redirect: 'manual',
+    });
+    assert.equal(toggleOn.status, 302);
+    assert.equal(toggleOn.headers.get('location'), '/about');
+    const setCookie = toggleOn.headers.get('set-cookie');
+    assert.match(setCookie, /^view=3d;/);
+
+    // With that cookie, the same mobile browser now gets the shell HTML.
+    const afterOn = await get('/about', { ...MOBILE, cookie: 'view=3d' });
+    assert.equal(afterOn.headers.get('x-preview-proxy-to'), null, 'no longer proxied');
+    assert.match(await afterOn.text(), /<h1>/);
+
+    // Click "2D view" again: cookie flips back, mobile is proxied again.
+    const toggleOff = await fetch(`${base}/__view/os`, {
+        headers: MOBILE,
+        redirect: 'manual',
+    });
+    assert.match(toggleOff.headers.get('set-cookie'), /^view=os;/);
+    const afterOff = await get('/', { ...MOBILE, cookie: 'view=os' });
+    assert.equal(afterOff.headers.get('x-preview-proxy-to'), 'https://codernointed-os.vercel.app/');
+});
+
+test('the view toggle round-trips: desktop can switch to 2D and back to 3D', async () => {
+    const before = await get('/about', BROWSER);
+    assert.equal(before.headers.get('x-preview-proxy-to'), null);
+
+    const toggleOn = await fetch(`${base}/__view/os`, { headers: BROWSER, redirect: 'manual' });
+    assert.equal(toggleOn.status, 302);
+    assert.match(toggleOn.headers.get('set-cookie'), /^view=os;/);
+
+    const afterOn = await get('/about', { ...BROWSER, cookie: 'view=os' });
+    assert.equal(afterOn.headers.get('x-preview-proxy-to'), 'https://codernointed-os.vercel.app/about');
+
+    const toggleOff = await fetch(`${base}/__view/3d`, { headers: BROWSER, redirect: 'manual' });
+    assert.match(toggleOff.headers.get('set-cookie'), /^view=3d;/);
+    const afterOff = await get('/about', { ...BROWSER, cookie: 'view=3d' });
+    assert.equal(afterOff.headers.get('x-preview-proxy-to'), null);
+});
+
+test('the view toggle never redirects off-site', async () => {
+    const res = await fetch(`${base}/__view/3d?to=${encodeURIComponent('https://evil.example/')}`, {
+        headers: BROWSER,
+        redirect: 'manual',
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), '/');
+});

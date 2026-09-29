@@ -11,6 +11,21 @@ export interface ToolbarProps {
     shutdown: () => void;
 }
 
+// The 3D shell doesn't exist on this OS's own preview host
+// (codernointed-os.vercel.app) - only on the public domain, which proxies
+// mobile (and now toggled-desktop) visitors here. Hide the button rather
+// than offer a switch that would just reload the same OS page.
+const showViewToggle =
+    typeof window !== 'undefined' &&
+    !window.location.hostname.includes('codernointed-os');
+
+const switchTo3D = () => {
+    const to = encodeURIComponent(
+        window.location.pathname + window.location.search
+    );
+    window.location.href = `/__view/3d?to=${to}`;
+};
+
 const Toolbar: React.FC<ToolbarProps> = ({
     windows,
     toggleMinimize,
@@ -181,6 +196,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     <Icon style={styles.volumeIcon} icon="volumeOn" />
                     <p style={styles.timeText}>{time}</p>
                 </div>
+                {showViewToggle && (
+                    <div
+                        style={styles.viewToggle}
+                        onMouseDown={switchTo3D}
+                        title="Switch to the 3D view"
+                    >
+                        <p style={styles.viewToggleText}>3D VIEW</p>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -364,6 +388,24 @@ const styles: StyleSheetCSS = {
     volumeIcon: {
         cursor: 'pointer',
         height: 18,
+    },
+    viewToggle: {
+        flexShrink: 1,
+        height: 24,
+        boxSizing: 'border-box',
+        marginRight: 4,
+        paddingLeft: 8,
+        paddingRight: 8,
+        border: `1px solid ${Colors.white}`,
+        borderTopColor: Colors.darkGray,
+        borderLeftColor: Colors.darkGray,
+        justifyContent: 'center',
+        alignItems: 'center',
+        cursor: 'pointer',
+    },
+    viewToggleText: {
+        fontSize: 12,
+        fontFamily: 'MSSerif',
     },
     tabText: {
         fontSize: 14,

@@ -7,6 +7,7 @@
 //   rewrite     -> rewrite(target, { headers })   (same-origin path)
 //   proxy       -> rewrite(absoluteUrl, { headers })
 //   response    -> new Response(body, { status, headers })
+//   redirect    -> new Response(null, { status: 302, headers })  (Location included)
 
 import {
     ROUTES,
@@ -22,9 +23,11 @@ const POSTHOG_ASSETS_ORIGIN = 'https://eu-assets.i.posthog.com';
 
 export const MARKDOWN_TYPE = 'text/markdown; charset=utf-8';
 
-// Accept and User-Agent both change the response body (markdown negotiation
-// and the mobile proxy), so every cache key has to include them.
-export const VARY = 'Accept, Accept-Encoding, User-Agent';
+// Accept, User-Agent and now the view-override cookie all change the
+// response body (markdown negotiation, the mobile proxy, and a visitor's
+// explicit 3D/2D choice from the toggle button), so every cache key has to
+// include them.
+export const VARY = 'Accept, Accept-Encoding, User-Agent, Cookie';
 
 const MOBILE_UA_REGEX =
     /Android|iPhone|iPod|iPad|IEMobile|BlackBerry|Opera Mini|webOS|Windows Phone|Mobile/i;
@@ -81,6 +84,67 @@ function header(headers, name) {
     if (typeof headers.get === 'function') return headers.get(name) ?? '';
     const direct = headers[name] ?? headers[name.toLowerCase()];
     return direct ?? '';
+}
+
+// Lets a visitor override the device-based 3D-shell-vs-2D-OS default and
+// have it stick across navigation. Set by GET /__view/os or /__view/3d (see
+// viewToggleResponse below); read back on every request via this cookie.
+export const VIEW_COOKIE_NAME = 'view';
+const VALID_VIEW_MODES = new Set(['os', '3d']);
+const VIEW_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
+
+/** Reads one cookie's value out of a raw `Cookie` request header. */
+export function readCookie(headers, name) {
+    const cookieHeader = header(headers, 'cookie');
+    if (!cookieHeader) return undefined;
+    for (const part of cookieHeader.split(';')) {
+        const eq = part.indexOf('=');
+        if (eq === -1) continue;
+        if (part.slice(0, eq).trim() === name) {
+            return decodeURIComponent(part.slice(eq + 1).trim());
+        }
+    }
+    return undefined;
+}
+
+/**
+ * The `?to=` a toggle redirect returns to must stay on this site - reject
+ * anything that could send a visitor elsewhere (a scheme, a protocol-
+ * relative `//host`, or a value that isn't even a path).
+ */
+function safeReturnPath(rawTo) {
+    if (!rawTo || !rawTo.startsWith('/') || rawTo.startsWith('//')) return '/';
+    if (/^\/[\t\n\r]*\//.test(rawTo)) return '/'; // e.g. "/\t/evil.example"
+    try {
+        // Resolving against a fixed origin both validates it (throws on a
+        // malformed value) and normalizes it back to a same-origin path.
+        const resolved = new URL(rawTo, 'https://paulbotchwey.com');
+        if (resolved.origin !== 'https://paulbotchwey.com') return '/';
+        return resolved.pathname + resolved.search;
+    } catch {
+        return '/';
+    }
+}
+
+/**
+ * GET /__view/os or /__view/3d: sets the view cookie and redirects back to
+ * `?to=` (default "/"). Both the 3D shell and the 2D OS link here from an
+ * always-visible toggle button so either can be reached from the other, on
+ * any device.
+ */
+function viewToggleResponse(url) {
+    const mode = url.pathname.slice('/__view/'.length);
+    if (!VALID_VIEW_MODES.has(mode)) return null;
+
+    const location = safeReturnPath(url.searchParams.get('to'));
+    return {
+        kind: 'redirect',
+        headers: {
+            Location: location,
+            'Set-Cookie': `${VIEW_COOKIE_NAME}=${mode}; Path=/; Max-Age=${VIEW_COOKIE_MAX_AGE}; SameSite=Lax`,
+            'Cache-Control': 'no-store',
+        },
+    };
 }
 
 /**
@@ -182,7 +246,7 @@ function markdownLinkHeader(route) {
 
 /**
  * @param {{url: string, headers?: any}} request
- * @returns {{kind: 'next'|'rewrite'|'proxy'|'response', path?: string, url?: string, status?: number, body?: string, headers: Record<string,string>}}
+ * @returns {{kind: 'next'|'rewrite'|'proxy'|'response'|'redirect', path?: string, url?: string, status?: number, body?: string, headers: Record<string,string>}}
  */
 export function routeRequest(request) {
     const url = new URL(request.url);
@@ -193,6 +257,11 @@ export function routeRequest(request) {
     const posthogTarget = posthogProxyTarget(url);
     if (posthogTarget) {
         return { kind: 'proxy', url: posthogTarget, headers: {} };
+    }
+
+    if (path.startsWith('/__view/')) {
+        const toggle = viewToggleResponse(url);
+        if (toggle) return toggle;
     }
 
     const innerSite = isInnerSiteHost(header(headers, 'host'));
@@ -250,10 +319,21 @@ export function routeRequest(request) {
 
     const htmlHeaders = { Vary: VARY, Link: markdownLinkHeader(route) };
 
-    // Mobile visitor on the 3D shell's domain: proxy straight to the OS
-    // content, address bar stays on the shell's own domain. Standalone pages
-    // (the privacy policy) exist only here, and bots always get this origin.
-    if (route.kind === 'os' && isMobileRequest(headers) && !isBotRequest(headers)) {
+    // A visitor who clicked the toggle button gets what they asked for
+    // regardless of device; otherwise device sniffing decides as before.
+    // Bots always get the shell HTML - never the cookie, never the device
+    // default - since the OS deployment is deliberately noindex and agents
+    // need the readable, structured-data-bearing page regardless of what a
+    // human visitor on the same browser profile last chose.
+    const viewCookie = readCookie(headers, VIEW_COOKIE_NAME);
+    const wantsOS =
+        viewCookie === 'os' ? true : viewCookie === '3d' ? false : isMobileRequest(headers);
+
+    // Mobile visitor (or anyone who chose the 2D view) on the 3D shell's
+    // domain: proxy straight to the OS content, address bar stays on the
+    // shell's own domain. Standalone pages (the privacy policy) exist only
+    // here, and bots always get this origin.
+    if (route.kind === 'os' && wantsOS && !isBotRequest(headers)) {
         return {
             kind: 'proxy',
             url: `${INNER_SITE_ORIGIN}${url.pathname}${url.search}`,
