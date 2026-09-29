@@ -6,18 +6,25 @@
 //
 //   node scripts/preview-server.mjs [--dir portfolio-website/public] [--port 4173]
 //
+// Paths middleware.ts's matcher would skip bypass routeRequest entirely,
+// exactly like on Vercel - going straight to routeRequest for every path
+// regardless of the matcher is what let a real bug ship undetected once
+// (mobile visitors' proxied OS page couldn't load its own JS/CSS, because
+// the matcher never even ran the edge function for those paths - see
+// isMatcherIncluded in site/request-router.mjs).
+//
 // External proxies (PostHog, the mobile OS deployment) are not followed; the
 // response instead reports the target in an `x-preview-proxy-to` header so the
 // decision can still be asserted. test/endpoints.test.mjs drives this server.
 
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat, readFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 
-import { routeRequest } from '../site/request-router.mjs';
+import { INNER_SITE_ORIGIN, isMatcherIncluded, routeRequest } from '../site/request-router.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_DIR = resolve(SCRIPT_DIR, '../portfolio-website/public');
@@ -83,13 +90,74 @@ async function sendNotFoundPage(res, rootDir, extraHeaders) {
     }
 }
 
-export function createPreviewServer({ rootDir = DEFAULT_DIR, host = 'paulbotchwey.com' } = {}) {
+/**
+ * Real HTTP proxy to `targetOrigin`, forcing the Host header the way Vercel's
+ * rewrite() would - fetch() refuses to override Host (it's a forbidden
+ * header per spec), so this uses node:http directly. Used when a test opts
+ * into `realProxyTo` to verify a proxied page's own asset requests actually
+ * resolve, not just that the initial page fetch was routed correctly.
+ */
+function proxyReal(targetUrlString, targetOrigin, forwardHeaders) {
+    return new Promise((resolvePromise, reject) => {
+        const targetUrl = new URL(targetUrlString);
+        const upstreamReq = httpRequest(
+            {
+                hostname: targetUrl.hostname,
+                port: targetUrl.port,
+                path: targetUrl.pathname + targetUrl.search,
+                method: 'GET',
+                headers: { ...forwardHeaders, host: new URL(targetOrigin).host },
+            },
+            (upstreamRes) => {
+                const chunks = [];
+                upstreamRes.on('data', (chunk) => chunks.push(chunk));
+                upstreamRes.on('end', () =>
+                    resolvePromise({
+                        status: upstreamRes.statusCode,
+                        contentType: upstreamRes.headers['content-type'],
+                        body: Buffer.concat(chunks),
+                    })
+                );
+            }
+        );
+        upstreamReq.on('error', reject);
+        upstreamReq.end();
+    });
+}
+
+/**
+ * @param {object} [options]
+ * @param {string} [options.rootDir]
+ * @param {string} [options.host]
+ * @param {string} [options.realProxyTo] - When set, 'proxy' actions whose
+ *   target starts with INNER_SITE_ORIGIN are genuinely fetched from this
+ *   local origin instead of returning the `x-preview-proxy-to` stub - a
+ *   faithful reproduction of the mobile-proxy path for tests that need to
+ *   verify the proxied page's own assets actually resolve (not just that
+ *   the initial fetch was routed correctly), which is what let a real bug
+ *   ship undetected once (see the file header comment).
+ */
+export function createPreviewServer({ rootDir = DEFAULT_DIR, host = 'paulbotchwey.com', realProxyTo } = {}) {
     return createServer(async (req, res) => {
         const headers = { ...req.headers };
         // Requests arrive on localhost; the router branches on the public host.
         headers.host = headers['x-forwarded-host'] ?? headers.host ?? host;
         if (/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(headers.host)) {
             headers.host = host;
+        }
+
+        const pathname = new URL(req.url, `https://${headers.host}`).pathname;
+        if (!isMatcherIncluded(pathname)) {
+            // Vercel's static layer serves this directly - the edge
+            // function, and therefore routeRequest, never runs.
+            const filePath = await resolveFile(rootDir, pathname);
+            if (!filePath) {
+                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('404 Not Found (static layer, matcher-skipped)\n');
+                return;
+            }
+            await sendFile(res, filePath, {});
+            return;
         }
 
         const action = routeRequest({
@@ -110,6 +178,19 @@ export function createPreviewServer({ rootDir = DEFAULT_DIR, host = 'paulbotchwe
         }
 
         if (action.kind === 'proxy') {
+            if (realProxyTo && action.url.startsWith(INNER_SITE_ORIGIN)) {
+                const target = action.url.replace(INNER_SITE_ORIGIN, realProxyTo);
+                const upstream = await proxyReal(target, INNER_SITE_ORIGIN, {
+                    'user-agent': headers['user-agent'] || '',
+                    accept: headers.accept || '*/*',
+                });
+                res.writeHead(upstream.status, {
+                    'content-type': upstream.contentType || 'application/octet-stream',
+                    ...action.headers,
+                });
+                res.end(upstream.body);
+                return;
+            }
             res.writeHead(200, {
                 ...action.headers,
                 'Content-Type': 'text/plain; charset=utf-8',

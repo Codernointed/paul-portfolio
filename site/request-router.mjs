@@ -10,6 +10,7 @@
 //   redirect    -> new Response(null, { status: 302, headers })  (Location included)
 
 import {
+    AGENT_FILES,
     ROUTES,
     normalizePath,
     routeForMarkdownPath,
@@ -78,6 +79,62 @@ export const MIDDLEWARE_SKIPPED_EXTENSIONS = [
     'json',
     'ts',
 ];
+
+// The 2D OS's own build output - its JS bundle, CSS, js-dos game assets,
+// favicon, manifest. These have to reach the edge function even though most
+// of them end in a MIDDLEWARE_SKIPPED_EXTENSIONS extension: a mobile
+// visitor's page load is proxied to codernointed-os.vercel.app
+// (proxyToOS below), and the HTML that comes back references these exact
+// paths - none of which exist anywhere in this shell deployment's own
+// static output. If the edge function doesn't run for them, Vercel's
+// static layer 404s them directly and routeRequest never gets a chance to
+// proxy them - this shipped once already (mobile visitors got a blank
+// white page because their OS page's own JS/CSS 404ed).
+export const OS_MATCHED_PREFIXES = ['/static/', '/js-dos/'];
+export const OS_MATCHED_EXACT_PATHS = [
+    '/favicon.ico',
+    '/manifest.json',
+    '/asset-manifest.json',
+    '/diag.html',
+    '/digger.jsdos',
+    '/doom.jsdos',
+    '/scrabble.jsdos',
+    '/trail.jsdos',
+];
+
+const SKIPPED_EXTENSION_REGEX = new RegExp(
+    `\\.(?:${MIDDLEWARE_SKIPPED_EXTENSIONS.join('|')})$`,
+    'i'
+);
+
+/**
+ * Reproduces middleware.ts's config.matcher: true when the edge function
+ * actually runs for this path on Vercel, false when Vercel's static layer
+ * serves (or 404s) it directly without ever calling routeRequest.
+ *
+ * middleware.ts's own matcher has to be a hand-written literal (Vercel
+ * statically parses it at build time and rejects a computed value - see the
+ * comment there), so it cannot import this function. This is instead the
+ * single source of truth everything else uses: scripts/preview-server.mjs
+ * calls it so paths the matcher would skip are ALSO skipped in local
+ * testing (the gap that let the bug above ship undetected - the preview
+ * server used to run routeRequest for every path, matcher or not), and
+ * test/middleware-matcher.test.mjs cross-checks middleware.ts's literal
+ * against it so the two can't silently drift apart.
+ */
+export function isMatcherIncluded(pathname) {
+    if (pathname.startsWith('/ingest/')) return true;
+    if (OS_MATCHED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+        return true;
+    }
+    if (OS_MATCHED_EXACT_PATHS.includes(pathname)) return true;
+    return !SKIPPED_EXTENSION_REGEX.test(pathname);
+}
+
+// The generated agent/SEO files - always the shell's own copy, never
+// proxied to the OS (see the exemption in routeRequest). Built once from
+// AGENT_FILES so it can't drift from the actual generated file list.
+const AGENT_FILE_PATHS = new Set(Object.values(AGENT_FILES));
 
 function header(headers, name) {
     if (!headers) return '';
@@ -266,6 +323,74 @@ export function routeRequest(request) {
 
     const innerSite = isInnerSiteHost(header(headers, 'host'));
 
+    // Looked up early because both the markdown-negotiation check and the
+    // OS-proxy decision below need to know whether this path is one of the
+    // known page routes (undefined for asset paths and unknown paths).
+    const route = routeForPath(path);
+
+    // A client that explicitly asks for markdown always gets the shell's
+    // markdown for that route, regardless of device or the view cookie -
+    // this is what keeps an agent whose UA happens to look mobile-shaped
+    // (some crawlers do) off the noindex OS deployment, which has almost no
+    // server-rendered text for it to read. Bots already never get proxied
+    // below, but a plain client requesting text/markdown does too, in case
+    // its UA doesn't match the bot patterns. Never on the OS's own host,
+    // though - no .md files exist in that deployment's build output.
+    if (!innerSite && route && prefersMarkdown(header(headers, 'accept'))) {
+        return {
+            kind: 'rewrite',
+            path: route.markdown,
+            headers: {
+                'Content-Type': MARKDOWN_TYPE,
+                Vary: VARY,
+                Link: markdownLinkHeader(route),
+            },
+        };
+    }
+
+    // Whether THIS visitor (by cookie override, else device) should see the
+    // 2D OS rather than the 3D shell. Has to gate not just the page HTML
+    // but every asset that page's own HTML references (its JS bundle, CSS,
+    // js-dos assets, favicon, manifest - none of which exist in this shell
+    // deployment's own static output, so they must be proxied too, not just
+    // the page navigation). A visitor proxied to the OS's index.html only
+    // ever requests OS-owned asset paths afterward - the shell's own asset
+    // paths (bundle.js, textures, ...) are simply never referenced by that
+    // page - so it's safe to route this decision ahead of the static-asset
+    // short-circuit below. Bots never get proxied: the OS deployment is
+    // deliberately noindex, and agents need the readable, structured-data-
+    // bearing shell page regardless of what a human on the same browser
+    // profile chose.
+    const viewCookie = readCookie(headers, VIEW_COOKIE_NAME);
+    const wantsOS =
+        viewCookie === 'os' ? true : viewCookie === '3d' ? false : isMobileRequest(headers);
+    const proxyToOS = !innerSite && wantsOS && !isBotRequest(headers);
+
+    // Standalone pages (currently just /privacy) exist only on the shell
+    // and always render here, regardless of device or the toggle - they
+    // have no OS equivalent to proxy to, and none of their own asset needs
+    // live under the OS's paths either. The generated agent/SEO files
+    // (sitemap.xml, robots.txt, llms.txt, llms-full.txt, agents.md,
+    // 404.html) get the same exemption: an automated tool that fetches
+    // these directly (a directory checker, an SEO auditor, a link-preview
+    // bot with a mobile-shaped UA that isBotRequest doesn't recognise)
+    // needs the shell's own copy, not a 404 against whatever the OS
+    // deployment happens to have at that path - it doesn't have most of
+    // them, and where it does (its own /robots.txt), it's a different file
+    // entirely, which would silently defeat the whole point of publishing
+    // these for agents in the first place.
+    if (
+        proxyToOS &&
+        (!route || route.kind !== 'standalone') &&
+        !AGENT_FILE_PATHS.has(path)
+    ) {
+        return {
+            kind: 'proxy',
+            url: `${INNER_SITE_ORIGIN}${url.pathname}${url.search}`,
+            headers: { Vary: VARY },
+        };
+    }
+
     if (isStaticAssetPath(path)) {
         // Markdown alternates are static files, but they still need the
         // negotiation headers so caches key them correctly.
@@ -278,8 +403,6 @@ export function routeRequest(request) {
         }
         return { kind: 'next', headers: { Vary: VARY } };
     }
-
-    const route = routeForPath(path);
 
     if (!route) {
         const wantsHtml = acceptsHtml(header(headers, 'accept'));
@@ -305,46 +428,12 @@ export function routeRequest(request) {
         return { kind: 'rewrite', path: `/index.html${url.search}`, headers: {} };
     }
 
-    if (prefersMarkdown(header(headers, 'accept'))) {
-        return {
-            kind: 'rewrite',
-            path: route.markdown,
-            headers: {
-                'Content-Type': MARKDOWN_TYPE,
-                Vary: VARY,
-                Link: markdownLinkHeader(route),
-            },
-        };
-    }
-
-    const htmlHeaders = { Vary: VARY, Link: markdownLinkHeader(route) };
-
-    // A visitor who clicked the toggle button gets what they asked for
-    // regardless of device; otherwise device sniffing decides as before.
-    // Bots always get the shell HTML - never the cookie, never the device
-    // default - since the OS deployment is deliberately noindex and agents
-    // need the readable, structured-data-bearing page regardless of what a
-    // human visitor on the same browser profile last chose.
-    const viewCookie = readCookie(headers, VIEW_COOKIE_NAME);
-    const wantsOS =
-        viewCookie === 'os' ? true : viewCookie === '3d' ? false : isMobileRequest(headers);
-
-    // Mobile visitor (or anyone who chose the 2D view) on the 3D shell's
-    // domain: proxy straight to the OS content, address bar stays on the
-    // shell's own domain. Standalone pages (the privacy policy) exist only
-    // here, and bots always get this origin.
-    if (route.kind === 'os' && wantsOS && !isBotRequest(headers)) {
-        return {
-            kind: 'proxy',
-            url: `${INNER_SITE_ORIGIN}${url.pathname}${url.search}`,
-            headers: htmlHeaders,
-        };
-    }
-
+    // Reaching here, proxyToOS was false (or route was the exempt
+    // standalone page) - render the shell's own file.
     return {
         kind: 'rewrite',
         path: `${route.file}${url.search}`,
-        headers: htmlHeaders,
+        headers: { Vary: VARY, Link: markdownLinkHeader(route) },
     };
 }
 

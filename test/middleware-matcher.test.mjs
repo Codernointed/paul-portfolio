@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { MIDDLEWARE_SKIPPED_EXTENSIONS } from '../site/request-router.mjs';
+import { MIDDLEWARE_SKIPPED_EXTENSIONS, OS_MATCHED_EXACT_PATHS, OS_MATCHED_PREFIXES, isMatcherIncluded } from '../site/request-router.mjs';
 import { ROUTES, AGENT_FILES } from '../site/site-meta.mjs';
 
 const MIDDLEWARE_SOURCE = readFileSync(
@@ -20,15 +20,11 @@ const MIDDLEWARE_SOURCE = readFileSync(
     'utf8'
 );
 
-// Mirrors middleware.ts's config.matcher exactly.
-const PAGE_PATTERN = new RegExp(
-    `^/((?!.*\\.(?:${MIDDLEWARE_SKIPPED_EXTENSIONS.join('|')})$).*)$`
-);
-const INGEST_PATTERN = /^\/ingest\/.*$/;
-
-function isMatched(pathname) {
-    return PAGE_PATTERN.test(pathname) || INGEST_PATTERN.test(pathname);
-}
+// isMatcherIncluded is the single source of truth (see its own comment in
+// site/request-router.mjs); middleware.ts's own matcher has to be a
+// hand-written literal instead (Vercel requires that), so the tests below
+// cross-check the two instead of importing one into the other.
+const isMatched = isMatcherIncluded;
 
 test('every page route and agent file stays matched', () => {
     for (const route of ROUTES) {
@@ -49,7 +45,7 @@ test('the PostHog ingest proxy stays matched regardless of its own extension', (
     assert.ok(isMatched('/ingest/static/recorder.js'));
 });
 
-test('every real static asset extension in both builds is skipped', () => {
+test('every real shell-owned static asset extension is skipped', () => {
     const examples = [
         '/bundle.39c5ae57844f8641.js',
         '/main.css',
@@ -68,15 +64,40 @@ test('every real static asset extension in both builds is skipped', () => {
         '/audio/computer/idle.wav',
         '/draco/draco_wasm_wrapper.js',
         '/draco/draco_decoder.wasm',
-        '/manifest.json',
-        '/doom.jsdos',
-        '/trail.jsdos',
-        '/js-dos/wdosbox.wasm',
-        '/js-dos/wdosbox.js.symbols',
-        '/js-dos/types/src/dom.d.ts',
     ];
     for (const path of examples) {
         assert.ok(!isMatched(path), `${path} should be skipped (static layer serves it directly)`);
+    }
+});
+
+// These are the 2D OS's own build output - the paths a mobile visitor's
+// proxied page actually references for its JS bundle, CSS, js-dos game
+// assets, favicon and manifest. Fixed a real production bug: because these
+// were excluded the same way as the shell's own binary assets, the
+// middleware never ran for them, Vercel's static layer 404ed them directly
+// (this shell deployment has no /static/ or /js-dos/ directory at all), and
+// mobile visitors got a blank white page instead of the OS.
+test("the OS's own build output stays matched even though most of it has a skipped extension", () => {
+    const examples = [
+        '/static/js/main.84cdf68a.js',
+        '/static/css/main.a3e1ea22.css',
+        '/static/media/logo.abc123.svg',
+        '/js-dos/wdosbox.wasm',
+        '/js-dos/wdosbox.js.symbols',
+        '/js-dos/js-dos.js',
+        '/js-dos/js-dos.css',
+        '/js-dos/types/src/dom.d.ts',
+        '/favicon.ico',
+        '/manifest.json',
+        '/asset-manifest.json',
+        '/diag.html',
+        '/digger.jsdos',
+        '/doom.jsdos',
+        '/scrabble.jsdos',
+        '/trail.jsdos',
+    ];
+    for (const path of examples) {
+        assert.ok(isMatched(path), `${path} must stay matched so it can be proxied to the OS`);
     }
 });
 
@@ -126,4 +147,19 @@ test("middleware.ts's hand-written matcher literal stays in sync with MIDDLEWARE
         "middleware.ts's matcher literal must match MIDDLEWARE_SKIPPED_EXTENSIONS exactly - " +
             'update the hand-written string in middleware.ts when that list changes'
     );
+});
+
+// Guards the literal entries isMatcherIncluded assumes middleware.ts's
+// matcher actually contains - a mismatch here means the two have drifted
+// apart, since middleware.ts can't import OS_MATCHED_PREFIXES/
+// OS_MATCHED_EXACT_PATHS directly (its matcher must be a static literal).
+test("middleware.ts's matcher source actually contains the OS build-output entries", () => {
+    for (const prefix of OS_MATCHED_PREFIXES) {
+        const entry = `'${prefix}:path*'`;
+        assert.ok(MIDDLEWARE_SOURCE.includes(entry), `middleware.ts's matcher must include ${entry}`);
+    }
+    for (const path of OS_MATCHED_EXACT_PATHS) {
+        const entry = `'${path}'`;
+        assert.ok(MIDDLEWARE_SOURCE.includes(entry), `middleware.ts's matcher must include ${entry}`);
+    }
 });
