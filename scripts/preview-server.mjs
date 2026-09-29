@@ -103,6 +103,12 @@ export function createPreviewServer({ rootDir = DEFAULT_DIR, host = 'paulbotchwe
             return;
         }
 
+        if (action.kind === 'redirect') {
+            res.writeHead(302, action.headers);
+            res.end();
+            return;
+        }
+
         if (action.kind === 'proxy') {
             res.writeHead(200, {
                 ...action.headers,

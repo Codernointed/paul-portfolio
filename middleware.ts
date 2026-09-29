@@ -57,6 +57,8 @@ export default function middleware(request: Request) {
                 status: action.status,
                 headers: action.headers,
             });
+        case 'redirect':
+            return new Response(null, { status: 302, headers: action.headers });
         default:
             return next({ headers: action.headers });
     }

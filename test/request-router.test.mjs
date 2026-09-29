@@ -5,11 +5,13 @@ import {
     INNER_SITE_ORIGIN,
     MARKDOWN_TYPE,
     VARY,
+    VIEW_COOKIE_NAME,
     acceptsHtml,
     isBotRequest,
     isMobileRequest,
     isStaticAssetPath,
     prefersMarkdown,
+    readCookie,
     routeRequest,
 } from '../site/request-router.mjs';
 import { ROUTES } from '../site/site-meta.mjs';
@@ -187,4 +189,94 @@ test('Headers objects are accepted as well as plain objects', () => {
         headers: new Headers({ host: 'paulbotchwey.com', accept: 'text/markdown' }),
     });
     assert.equal(action.path, '/about.md');
+});
+
+test('readCookie finds a named cookie among several and ignores others', () => {
+    const headers = { cookie: 'a=1; view=3d; b=2' };
+    assert.equal(readCookie(headers, VIEW_COOKIE_NAME), '3d');
+    assert.equal(readCookie(headers, 'a'), '1');
+    assert.equal(readCookie(headers, 'nope'), undefined);
+    assert.equal(readCookie({}, VIEW_COOKIE_NAME), undefined);
+    assert.equal(readCookie({ cookie: '' }, VIEW_COOKIE_NAME), undefined);
+});
+
+test('GET /__view/os and /__view/3d set the cookie and redirect to /', () => {
+    for (const mode of ['os', '3d']) {
+        const action = get(`/__view/${mode}`, { 'user-agent': DESKTOP_UA });
+        assert.equal(action.kind, 'redirect');
+        assert.equal(action.headers.Location, '/');
+        assert.match(action.headers['Set-Cookie'], new RegExp(`^view=${mode}; Path=/; Max-Age=\\d+; SameSite=Lax$`));
+        assert.equal(action.headers['Cache-Control'], 'no-store');
+    }
+});
+
+test('the view toggle redirects back to ?to= when it is a safe same-site path', () => {
+    const action = get('/__view/3d?to=%2Fprojects%2Fmobile', { 'user-agent': DESKTOP_UA });
+    assert.equal(action.headers.Location, '/projects/mobile');
+});
+
+test('the view toggle refuses to redirect off-site', () => {
+    const cases = [
+        'https://evil.example/',
+        '//evil.example/',
+        '/\t/evil.example',
+        '/\n/evil.example',
+        'javascript:alert(1)',
+        'not-a-path',
+        '',
+    ];
+    for (const to of cases) {
+        const action = get(`/__view/3d?to=${encodeURIComponent(to)}`, { 'user-agent': DESKTOP_UA });
+        assert.equal(action.headers.Location, '/', `"${to}" must not survive as a redirect target`);
+    }
+});
+
+test('an invalid /__view/ mode is not intercepted and falls through to a normal 404', () => {
+    const action = get('/__view/desktop', { accept: '*/*', 'user-agent': 'curl/8.4.0' });
+    assert.equal(action.kind, 'response');
+    assert.equal(action.status, 404);
+});
+
+test('a view=os cookie forces the 2D OS proxy even on desktop', () => {
+    const action = get('/about', {
+        accept: BROWSER_ACCEPT,
+        'user-agent': DESKTOP_UA,
+        cookie: 'view=os',
+    });
+    assert.equal(action.kind, 'proxy');
+    assert.equal(action.url, `${INNER_SITE_ORIGIN}/about`);
+});
+
+test('a view=3d cookie forces the shell HTML even on mobile', () => {
+    const action = get('/about', {
+        accept: BROWSER_ACCEPT,
+        'user-agent': MOBILE_UA,
+        cookie: 'view=3d',
+    });
+    assert.equal(action.kind, 'rewrite');
+    assert.equal(action.path, '/about.html');
+});
+
+test('bots always get the shell regardless of a view=os cookie', () => {
+    const action = get('/about', {
+        accept: BROWSER_ACCEPT,
+        'user-agent': GOOGLEBOT_MOBILE_UA,
+        cookie: 'view=os',
+    });
+    assert.equal(action.kind, 'rewrite');
+    assert.equal(action.path, '/about.html');
+});
+
+test('no cookie preserves the plain device-based default', () => {
+    assert.equal(get('/about', { accept: BROWSER_ACCEPT, 'user-agent': DESKTOP_UA }).kind, 'rewrite');
+    assert.equal(get('/about', { accept: BROWSER_ACCEPT, 'user-agent': MOBILE_UA }).kind, 'proxy');
+});
+
+test('an unrelated cookie alongside a garbage view value does not override the device default', () => {
+    const action = get('/about', {
+        accept: BROWSER_ACCEPT,
+        'user-agent': DESKTOP_UA,
+        cookie: 'analytics_id=xyz; view=bogus',
+    });
+    assert.equal(action.kind, 'rewrite', 'an unrecognised view value must not force the OS proxy');
 });
